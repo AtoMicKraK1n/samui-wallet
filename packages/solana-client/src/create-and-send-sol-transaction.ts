@@ -8,6 +8,8 @@ import {
   sendAndConfirmTransactionFactory,
   signTransactionMessageWithSigners,
 } from './index'
+import { lamportsToSol } from './lamports-to-sol'
+import { maxAvailableSolAmount } from './max-available-sol-amount'
 
 export async function createAndSendSolTransaction(
   client: SolanaClient,
@@ -15,12 +17,25 @@ export async function createAndSendSolTransaction(
     amount,
     destination,
     sender,
+    senderBalance,
   }: {
     amount: string
     destination: string
     sender: KeyPairSigner
+    senderBalance: string
   },
 ): Promise<string> {
+  const amountBigInt = BigInt(amount)
+  const senderBalanceBigInt = BigInt(senderBalance)
+
+  const maxAvailable = maxAvailableSolAmount(senderBalanceBigInt, amountBigInt)
+
+  if (amountBigInt > maxAvailable) {
+    throw new Error(
+      `Insufficient balance. Available: ${lamportsToSol(senderBalanceBigInt)} SOL, Requested: ${lamportsToSol(amountBigInt)} SOL, Max sendable (after fees): ${lamportsToSol(maxAvailable)} SOL`,
+    )
+  }
+
   const { value: latestBlockhash } = await client.rpc.getLatestBlockhash().send()
   const transactionMessage = createSolTransferTransaction({
     amount,
